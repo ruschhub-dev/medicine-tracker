@@ -1,11 +1,13 @@
-// Função serverless (Vercel) agendada por Cron: procura remédios vencendo/vencidos
-// e envia Web Push aos aparelhos inscritos. Lê o Supabase com a service role.
+// Função serverless (Vercel) agendada por Cron: por FAMÍLIA, procura remédios
+// vencendo/vencidos e avisa só os aparelhos/e-mails daquela família. Service role.
 import webpush from 'web-push'
 import nodemailer from 'nodemailer'
 import { createClient } from '@supabase/supabase-js'
+import { subsPorFamilia, emailsPorFamilia, enviarPush } from './_familias'
 
 type ItemEstoque = {
   id: string
+  familia_id: string
   data_validade: string
   data_abertura: string | null
   validade_apos_aberto_dias: number | null
@@ -50,84 +52,87 @@ export default async function handler(req: any, res: any) {
 
   const { data: itens, error } = await supabase
     .from('estoque')
-    .select('id,data_validade,data_abertura,validade_apos_aberto_dias,medicamento:medicamentos(nome,concentracao)')
+    .select('id,familia_id,data_validade,data_abertura,validade_apos_aberto_dias,medicamento:medicamentos(nome,concentracao)')
     .eq('status', 'ativo')
   if (error) return res.status(500).json({ error: error.message })
 
-  const criticos = ((itens as any[]) || [])
-    .map((i) => ({ i: i as ItemEstoque, d: diasPara(i as ItemEstoque) }))
-    .filter((x) => x.d <= DIAS_ANTECEDENCIA)
-    .sort((a, b) => a.d - b.d)
-
-  if (criticos.length === 0) {
-    return res.status(200).json({ enviados: 0, motivo: 'nada vencendo' })
+  // Agrupa os itens críticos (≤15 dias ou vencidos) por família.
+  const porFamilia = new Map<string, Array<{ i: ItemEstoque; d: number }>>()
+  for (const raw of (itens as any[]) || []) {
+    const i = raw as ItemEstoque
+    const d = diasPara(i)
+    if (d > DIAS_ANTECEDENCIA) continue
+    const arr = porFamilia.get(i.familia_id) || []
+    arr.push({ i, d })
+    porFamilia.set(i.familia_id, arr)
   }
 
-  const vencidos = criticos.filter((x) => x.d < 0).length
-  const partes = criticos.slice(0, 5).map(({ i, d }) => {
-    const nome = i.medicamento?.nome ?? 'Remédio'
-    if (d < 0) return `${nome} (vencido)`
-    if (d === 0) return `${nome} (vence hoje)`
-    return `${nome} (${d}d)`
-  })
-  const title = vencidos > 0
-    ? `⚠️ ${criticos.length} remédio(s) para conferir`
-    : `${criticos.length} remédio(s) vencendo`
-  let body = partes.join(', ')
-  if (criticos.length > 5) body += `… e mais ${criticos.length - 5}`
-
-  const { data: subs } = await supabase.from('push_subscriptions').select('endpoint,p256dh,auth')
-  const payload = JSON.stringify({ title, body, url: '/descarte', tag: 'validade' })
-
-  let enviados = 0
-  for (const s of (subs as any[]) || []) {
-    try {
-      await webpush.sendNotification(
-        { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
-        payload,
-      )
-      enviados++
-    } catch (e: any) {
-      // Inscrição expirada/inválida: remove
-      if (e?.statusCode === 404 || e?.statusCode === 410) {
-        await supabase.from('push_subscriptions').delete().eq('endpoint', s.endpoint)
-      }
-    }
+  if (porFamilia.size === 0) {
+    return res.status(200).json({ familias: 0, enviados: 0, motivo: 'nada vencendo' })
   }
 
-  // E-mail (opcional): resumo por e-mail se GMAIL_USER + GMAIL_APP_PASSWORD existirem.
-  let emails = 0
+  const subsMap = await subsPorFamilia(supabase)
   const gmailUser = process.env.GMAIL_USER
   const gmailPass = process.env.GMAIL_APP_PASSWORD
-  if (gmailUser && gmailPass) {
-    try {
-      const { data: usersData } = await supabase.auth.admin.listUsers()
-      const destinatarios = ((usersData?.users || []).map((u: any) => u.email).filter(Boolean)) as string[]
+  const usarEmail = Boolean(gmailUser && gmailPass)
+  const emailsMap = usarEmail ? await emailsPorFamilia(supabase) : new Map<string, string[]>()
+  const appUrl = process.env.APP_URL || ''
+  const transporter = usarEmail
+    ? nodemailer.createTransport({ service: 'gmail', auth: { user: gmailUser, pass: gmailPass } })
+    : null
+
+  let enviados = 0
+  let emails = 0
+  let familiasNotificadas = 0
+
+  for (const [familiaId, lista] of porFamilia) {
+    const criticos = lista.sort((a, b) => a.d - b.d)
+    const vencidos = criticos.filter((x) => x.d < 0).length
+
+    const partes = criticos.slice(0, 5).map(({ i, d }) => {
+      const nome = i.medicamento?.nome ?? 'Remédio'
+      if (d < 0) return `${nome} (vencido)`
+      if (d === 0) return `${nome} (vence hoje)`
+      return `${nome} (${d}d)`
+    })
+    const title = vencidos > 0
+      ? `⚠️ ${criticos.length} remédio(s) para conferir`
+      : `${criticos.length} remédio(s) vencendo`
+    let body = partes.join(', ')
+    if (criticos.length > 5) body += `… e mais ${criticos.length - 5}`
+
+    const payload = JSON.stringify({ title, body, url: '/descarte', tag: 'validade' })
+    const subs = subsMap.get(familiaId) || []
+    const n = await enviarPush(webpush, supabase, subs, payload)
+    enviados += n
+    if (n > 0) familiasNotificadas++
+
+    // E-mail: só para os membros desta família.
+    if (transporter) {
+      const destinatarios = emailsMap.get(familiaId) || []
       if (destinatarios.length > 0) {
-        const linhas = criticos.map(({ i, d }) => {
-          const nome = i.medicamento?.nome ?? 'Remédio'
-          const quando = d < 0 ? `vencido há ${-d} dia(s)` : d === 0 ? 'vence hoje' : `vence em ${d} dias`
-          return `<li><strong>${nome}</strong> — ${quando}</li>`
-        }).join('')
-        const html = '<h2>💊 Remédios da Família</h2>'
-          + `<p>${criticos.length} remédio(s) para conferir:</p><ul>${linhas}</ul>`
-          + '<p><a href="https://home-medicine-stock-tracker.vercel.app/descarte">Abrir o app</a></p>'
-        const transporter = nodemailer.createTransport({
-          service: 'gmail',
-          auth: { user: gmailUser, pass: gmailPass },
-        })
-        await transporter.sendMail({
-          from: `Remédios da Família <${gmailUser}>`,
-          to: destinatarios.join(','),
-          subject: title,
-          html,
-        })
-        emails = destinatarios.length
+        try {
+          const linhas = criticos.map(({ i, d }) => {
+            const nome = i.medicamento?.nome ?? 'Remédio'
+            const quando = d < 0 ? `vencido há ${-d} dia(s)` : d === 0 ? 'vence hoje' : `vence em ${d} dias`
+            return `<li><strong>${nome}</strong> — ${quando}</li>`
+          }).join('')
+          const link = appUrl ? `<p><a href="${appUrl}/descarte">Abrir o app</a></p>` : ''
+          const html = '<h2>💊 Remédios em casa</h2>'
+            + `<p>${criticos.length} remédio(s) para conferir:</p><ul>${linhas}</ul>${link}`
+          await transporter.sendMail({
+            from: `Remédios em casa <${gmailUser}>`,
+            to: destinatarios.join(','),
+            subject: title,
+            html,
+          })
+          emails += destinatarios.length
+        } catch {
+          // Não derruba o job se o e-mail de uma família falhar.
+        }
       }
-    } catch {
-      // Não derruba o job se o e-mail falhar.
     }
   }
 
-  return res.status(200).json({ enviados, emails, criticos: criticos.length, vencidos })
+  return res.status(200).json({ familias: familiasNotificadas, enviados, emails })
 }
