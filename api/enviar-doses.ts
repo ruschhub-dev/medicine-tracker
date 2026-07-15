@@ -3,7 +3,6 @@
 // enviando só para os aparelhos da FAMÍLIA de cada dose. Service role.
 import webpush from 'web-push'
 import { createClient } from '@supabase/supabase-js'
-import { subsPorFamilia, enviarPush } from './_familias'
 
 const UNI: Record<string, string> = {
   ml: 'mL', comprimidos: 'comp.', capsulas: 'cáps.', doses: 'doses',
@@ -12,6 +11,45 @@ const UNI: Record<string, string> = {
 
 function hojeBrasilia(): string {
   return new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10)
+}
+
+type Sub = { endpoint: string; p256dh: string; auth: string }
+
+// Mapa familia_id → inscrições push dos membros dela (membros → push_subscriptions).
+async function subsPorFamilia(supabase: any): Promise<Map<string, Sub[]>> {
+  const { data: membros } = await supabase.from('membros').select('familia_id, user_id')
+  const { data: subs } = await supabase.from('push_subscriptions').select('user_id, endpoint, p256dh, auth')
+  const porUsuario = new Map<string, Sub[]>()
+  for (const s of (subs as any[]) || []) {
+    if (!s.user_id) continue
+    const arr = porUsuario.get(s.user_id) || []
+    arr.push({ endpoint: s.endpoint, p256dh: s.p256dh, auth: s.auth })
+    porUsuario.set(s.user_id, arr)
+  }
+  const map = new Map<string, Sub[]>()
+  for (const m of (membros as any[]) || []) {
+    const us = porUsuario.get(m.user_id)
+    if (!us) continue
+    const arr = map.get(m.familia_id) || []
+    arr.push(...us)
+    map.set(m.familia_id, arr)
+  }
+  return map
+}
+
+async function enviarPush(supabase: any, subs: Sub[], payload: string): Promise<number> {
+  let enviados = 0
+  for (const s of subs) {
+    try {
+      await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload)
+      enviados++
+    } catch (e: any) {
+      if (e?.statusCode === 404 || e?.statusCode === 410) {
+        await supabase.from('push_subscriptions').delete().eq('endpoint', s.endpoint)
+      }
+    }
+  }
+  return enviados
 }
 
 export default async function handler(req: any, res: any) {
@@ -60,7 +98,7 @@ export default async function handler(req: any, res: any) {
       tag: `dose-${d.id}`,
     })
     const subs = subsMap.get(d.familia_id) || []
-    enviados += await enviarPush(webpush, supabase, subs, payload)
+    enviados += await enviarPush(supabase, subs, payload)
     await supabase.from('doses').update({ notificada_em: new Date().toISOString() }).eq('id', d.id)
   }
 
