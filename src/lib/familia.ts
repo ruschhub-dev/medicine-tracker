@@ -25,6 +25,19 @@ function load<T>(key: string): T[] {
 }
 function save<T>(key: string, v: T[]) { localStorage.setItem(key, JSON.stringify(v)) }
 
+const LIMITE_GRATIS_MSG = 'O plano grátis permite apenas uma família. Assine o Premium para ter mais.'
+
+/** Modo local: pode entrar/criar mais uma família? (grátis = 1; Premium libera) */
+function podeAddLocal(): boolean {
+  const mems = load<MembroLocal>(K.membros).filter(m => m.user_id === LOCAL_USER)
+  if (mems.length === 0) return true
+  const fams = load<Familia>(K.familias)
+  return mems.some(m => {
+    const f = fams.find(x => x.id === m.familia_id)
+    return !!f && f.plano === 'premium' && (!f.plano_ate || new Date(f.plano_ate) > new Date())
+  })
+}
+
 type MembroLocal = { familia_id: string; user_id: string; papel: PapelMembro; nome: string }
 type ConviteLocal = { codigo: string; familia_id: string; usos: number; usos_max: number | null; expira_em: string | null }
 
@@ -96,6 +109,7 @@ export async function criarFamilia(nome: string): Promise<string> {
   const nomeLimpo = nome.trim()
   if (!nomeLimpo) throw new Error('Informe um nome para a família.')
   if (!hasSupabase) {
+    if (!podeAddLocal()) throw new Error(LIMITE_GRATIS_MSG)
     const f: Familia = {
       id: uid(), nome: nomeLimpo, owner_id: LOCAL_USER,
       plano: 'gratis', plano_ate: null, created_at: nowISO(),
@@ -131,6 +145,7 @@ export async function entrarComConvite(codigo: string): Promise<string> {
   const cod = codigo.trim().toUpperCase()
   if (!cod) throw new Error('Cole o código do convite.')
   if (!hasSupabase) {
+    if (!podeAddLocal()) throw new Error(LIMITE_GRATIS_MSG)
     const convites = load<ConviteLocal>(K.convites)
     const c = convites.find(x => x.codigo === cod)
     if (!c) throw new Error('Convite inválido.')

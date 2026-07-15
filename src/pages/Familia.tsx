@@ -7,7 +7,7 @@ import { useFamilia } from '../lib/familiaContext'
 import { gerarConvite, listMembros, sairDaFamilia, souAdmin, criarFamilia, entrarComConvite } from '../lib/familia'
 
 export default function Familia() {
-  const { ativa, premium, recarregar } = useFamilia()
+  const { ativa, premium, podeAdicionarFamilia, recarregar } = useFamilia()
   const [perfis, setPerfis] = useState<Perfil[]>([])
   const [membros, setMembros] = useState<MembroFamilia[]>([])
   const [nome, setNome] = useState('')
@@ -149,18 +149,27 @@ export default function Familia() {
       <div className="card" style={{ display: 'grid', gap: 12 }}>
         <div>
           <strong>Outras famílias</strong>
-          <p className="hint">Você pode participar de mais de uma (ex.: a sua e a dos seus pais). Troque pelo seletor no topo.</p>
+          <p className="hint">Participe de mais de uma (ex.: a sua e a dos seus pais). Troque pelo seletor no topo.</p>
         </div>
-        <form onSubmit={entrarOutra} style={{ display: 'flex', gap: 8 }}>
-          <input className="input" value={codigoEntrar} onChange={e => setCodigoEntrar(e.target.value)}
-            placeholder="Código de convite" aria-label="Código de convite" style={{ flex: 1, textTransform: 'uppercase' }} />
-          <button type="submit" className="btn btn-primary">Entrar</button>
-        </form>
-        <form onSubmit={criarOutra} style={{ display: 'flex', gap: 8 }}>
-          <input className="input" value={novoNome} onChange={e => setNovoNome(e.target.value)}
-            placeholder="Nome da nova família" aria-label="Nome da nova família" style={{ flex: 1 }} />
-          <button type="submit" className="btn btn-outline">Criar</button>
-        </form>
+        {podeAdicionarFamilia ? (
+          <>
+            <form onSubmit={entrarOutra} style={{ display: 'flex', gap: 8 }}>
+              <input className="input" value={codigoEntrar} onChange={e => setCodigoEntrar(e.target.value)}
+                placeholder="Código de convite" aria-label="Código de convite" style={{ flex: 1, textTransform: 'uppercase' }} />
+              <button type="submit" className="btn btn-primary">Entrar</button>
+            </form>
+            <form onSubmit={criarOutra} style={{ display: 'flex', gap: 8 }}>
+              <input className="input" value={novoNome} onChange={e => setNovoNome(e.target.value)}
+                placeholder="Nome da nova família" aria-label="Nome da nova família" style={{ flex: 1 }} />
+              <button type="submit" className="btn btn-outline">Criar</button>
+            </form>
+          </>
+        ) : (
+          <div style={{ display: 'grid', gap: 8 }}>
+            <p className="hint" style={{ margin: 0 }}>No plano grátis você fica com uma família. Para participar de mais, seja Premium.</p>
+            <Link to="/premium" className="btn btn-primary btn-block">✨ Seja Premium</Link>
+          </div>
+        )}
       </div>
 
       {admin && (

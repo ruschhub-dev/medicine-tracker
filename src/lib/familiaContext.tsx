@@ -9,6 +9,7 @@ interface FamiliaCtx {
   familias: MinhaFamilia[]
   ativa: MinhaFamilia | null
   premium: boolean
+  podeAdicionarFamilia: boolean
   trocar: (id: string) => void
   recarregar: () => Promise<void>
 }
@@ -50,9 +51,11 @@ export function FamiliaProvider({ children }: { children: ReactNode }) {
   }
 
   const ativa = familias.find(f => f.id === ativaId) ?? null
+  // Plano grátis = 1 família; participar de mais exige alguma família Premium.
+  const podeAdicionarFamilia = familias.length === 0 || familias.some(ehPremium)
 
   return (
-    <Ctx.Provider value={{ carregando, familias, ativa, premium: ehPremium(ativa), trocar, recarregar }}>
+    <Ctx.Provider value={{ carregando, familias, ativa, premium: ehPremium(ativa), podeAdicionarFamilia, trocar, recarregar }}>
       {children}
     </Ctx.Provider>
   )
