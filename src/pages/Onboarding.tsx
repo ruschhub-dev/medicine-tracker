@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import { criarFamilia, entrarComConvite } from '../lib/familia'
 import { useFamilia } from '../lib/familiaContext'
 import { sair } from '../lib/auth'
@@ -75,6 +76,10 @@ export default function Onboarding() {
         {!modoLocal && (
           <button className="btn btn-outline" style={{ justifySelf: 'center' }} onClick={() => sair()}>Sair da conta</button>
         )}
+
+        <p className="hint" style={{ textAlign: 'center' }}>
+          <Link to="/termos">Termos</Link> · <Link to="/privacidade">Privacidade</Link>
+        </p>
       </div>
     </div>
   )

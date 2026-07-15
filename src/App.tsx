@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
+import type { ReactElement } from 'react'
 import Layout from './components/Layout'
 import Login from './pages/Login'
 import Onboarding from './pages/Onboarding'
@@ -13,12 +14,25 @@ import Descarte from './pages/Descarte'
 import Hoje from './pages/Hoje'
 import Tratamentos from './pages/Tratamentos'
 import Moderacao from './pages/Moderacao'
+import Privacidade from './pages/Privacidade'
+import Termos from './pages/Termos'
 import { useAuth } from './lib/auth'
 import { FamiliaProvider, useFamilia } from './lib/familiaContext'
 
 const Carregando = () => (
   <div style={{ padding: 48, textAlign: 'center' }} className="muted">Carregando…</div>
 )
+
+// Deixa as páginas legais acessíveis mesmo sem login/família; qualquer outra rota cai no fallback.
+function RotasComLegal({ fallback }: { fallback: ReactElement }) {
+  return (
+    <Routes>
+      <Route path="/privacidade" element={<Privacidade />} />
+      <Route path="/termos" element={<Termos />} />
+      <Route path="*" element={fallback} />
+    </Routes>
+  )
+}
 
 function AppRoutes() {
   return (
@@ -35,6 +49,8 @@ function AppRoutes() {
         <Route path="hoje" element={<Hoje />} />
         <Route path="tratamentos" element={<Tratamentos />} />
         <Route path="moderacao" element={<Moderacao />} />
+        <Route path="privacidade" element={<Privacidade />} />
+        <Route path="termos" element={<Termos />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
@@ -44,7 +60,7 @@ function AppRoutes() {
 function AppInterno() {
   const { carregando, familias, ativa } = useFamilia()
   if (carregando) return <Carregando />
-  if (familias.length === 0 || !ativa) return <Onboarding />
+  if (familias.length === 0 || !ativa) return <RotasComLegal fallback={<Onboarding />} />
   // key = família ativa: trocar de família remonta as telas e recarrega os dados.
   return <AppRoutes key={ativa.id} />
 }
@@ -53,7 +69,7 @@ export default function App() {
   const { session, loading, precisaLogin } = useAuth()
 
   if (loading) return <Carregando />
-  if (precisaLogin && !session) return <Login />
+  if (precisaLogin && !session) return <RotasComLegal fallback={<Login />} />
 
   return (
     <FamiliaProvider>

@@ -20,22 +20,31 @@ export function useAuth() {
   return { session, loading, precisaLogin: hasSupabase }
 }
 
-export function entrarComSenha(email: string, senha: string) {
-  return supabase!.auth.signInWithPassword({ email, password: senha })
-}
-
-export function criarConta(email: string, senha: string) {
-  return supabase!.auth.signUp({
+export function entrarComSenha(email: string, senha: string, captchaToken?: string) {
+  return supabase!.auth.signInWithPassword({
     email,
     password: senha,
-    options: { emailRedirectTo: window.location.origin },
+    options: captchaToken ? { captchaToken } : undefined,
   })
 }
 
-export function enviarLinkMagico(email: string) {
+export function criarConta(email: string, senha: string, captchaToken?: string) {
+  return supabase!.auth.signUp({
+    email,
+    password: senha,
+    options: {
+      emailRedirectTo: window.location.origin,
+      captchaToken,
+      // Registra o consentimento LGPD (termos + privacidade) no metadata do usuário.
+      data: { consentimento: { termos: true, privacidade: true, aceito_em: new Date().toISOString() } },
+    },
+  })
+}
+
+export function enviarLinkMagico(email: string, captchaToken?: string) {
   return supabase!.auth.signInWithOtp({
     email,
-    options: { emailRedirectTo: window.location.origin },
+    options: { emailRedirectTo: window.location.origin, captchaToken },
   })
 }
 
