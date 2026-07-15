@@ -5,6 +5,7 @@ import type { ItemEstoqueCompleto, ConsumoCompleto, DoseCompleta } from '../lib/
 import { UNIDADE_LABEL } from '../lib/types'
 import { diasParaVencer, estoqueBaixo, formatarData } from '../lib/dates'
 import ValidadeBadge, { stripeClass } from '../components/ValidadeBadge'
+import AdSlot from '../components/AdSlot'
 
 export default function Painel() {
   const [itens, setItens] = useState<ItemEstoqueCompleto[]>([])
@@ -133,6 +134,8 @@ export default function Painel() {
           </div>
         </section>
       )}
+
+      <AdSlot />
     </div>
   )
 }

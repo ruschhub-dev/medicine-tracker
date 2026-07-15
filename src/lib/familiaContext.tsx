@@ -8,8 +8,15 @@ interface FamiliaCtx {
   carregando: boolean
   familias: MinhaFamilia[]
   ativa: MinhaFamilia | null
+  premium: boolean
   trocar: (id: string) => void
   recarregar: () => Promise<void>
+}
+
+/** A família ativa está no plano Premium e dentro da validade? */
+function ehPremium(f: MinhaFamilia | null): boolean {
+  if (!f || f.plano !== 'premium') return false
+  return !f.plano_ate || new Date(f.plano_ate) > new Date()
 }
 
 const Ctx = createContext<FamiliaCtx | null>(null)
@@ -45,7 +52,7 @@ export function FamiliaProvider({ children }: { children: ReactNode }) {
   const ativa = familias.find(f => f.id === ativaId) ?? null
 
   return (
-    <Ctx.Provider value={{ carregando, familias, ativa, trocar, recarregar }}>
+    <Ctx.Provider value={{ carregando, familias, ativa, premium: ehPremium(ativa), trocar, recarregar }}>
       {children}
     </Ctx.Provider>
   )

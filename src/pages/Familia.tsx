@@ -7,7 +7,7 @@ import { useFamilia } from '../lib/familiaContext'
 import { gerarConvite, listMembros, sairDaFamilia, souAdmin, criarFamilia, entrarComConvite } from '../lib/familia'
 
 export default function Familia() {
-  const { ativa, recarregar } = useFamilia()
+  const { ativa, premium, recarregar } = useFamilia()
   const [perfis, setPerfis] = useState<Perfil[]>([])
   const [membros, setMembros] = useState<MembroFamilia[]>([])
   const [nome, setNome] = useState('')
@@ -93,11 +93,16 @@ export default function Familia() {
   return (
     <div style={{ display: 'grid', gap: 16 }}>
       <div>
-        <h2 style={{ fontSize: 20 }}>{ativa?.nome ?? 'Família'}</h2>
-        <p className="hint">
-          Plano {ativa?.plano === 'premium' ? 'Premium' : 'Grátis'} · convide quem cuida dos remédios com você.
-        </p>
+        <h2 style={{ fontSize: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
+          {ativa?.nome ?? 'Família'}
+          <span className={`badge ${premium ? 'badge-ok' : 'badge-muted'}`}>{premium ? '✨ Premium' : 'Grátis'}</span>
+        </h2>
+        <p className="hint">Convide quem cuida dos remédios com você.</p>
       </div>
+
+      {!premium && (
+        <Link to="/premium" className="btn btn-primary btn-block">✨ Seja Premium — sem anúncios e tudo liberado</Link>
+      )}
 
       {/* Convite */}
       <div className="card" style={{ display: 'grid', gap: 12 }}>

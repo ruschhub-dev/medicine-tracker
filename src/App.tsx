@@ -14,6 +14,7 @@ import Descarte from './pages/Descarte'
 import Hoje from './pages/Hoje'
 import Tratamentos from './pages/Tratamentos'
 import Moderacao from './pages/Moderacao'
+import Premium from './pages/Premium'
 import Privacidade from './pages/Privacidade'
 import Termos from './pages/Termos'
 import { useAuth } from './lib/auth'
@@ -49,6 +50,7 @@ function AppRoutes() {
         <Route path="hoje" element={<Hoje />} />
         <Route path="tratamentos" element={<Tratamentos />} />
         <Route path="moderacao" element={<Moderacao />} />
+        <Route path="premium" element={<Premium />} />
         <Route path="privacidade" element={<Privacidade />} />
         <Route path="termos" element={<Termos />} />
         <Route path="*" element={<Navigate to="/" replace />} />
