@@ -138,6 +138,14 @@ export default async function handler(req: any, res: any) {
   const gmailPass = process.env.GMAIL_APP_PASSWORD
   const usarEmail = Boolean(gmailUser && gmailPass)
   const emailsMap = usarEmail ? await emailsPorFamilia(supabase) : new Map<string, string[]>()
+  // E-mail de lembrete é um recurso Premium: só famílias Premium recebem (push é grátis).
+  const premiumSet = new Set<string>()
+  if (usarEmail) {
+    const { data: fams } = await supabase.from('familias').select('id,plano,plano_ate')
+    for (const f of (fams as any[]) || []) {
+      if (f.plano === 'premium' && (!f.plano_ate || new Date(f.plano_ate) > new Date())) premiumSet.add(f.id)
+    }
+  }
   const appUrl = process.env.APP_URL || ''
   const transporter = usarEmail
     ? nodemailer.createTransport({ service: 'gmail', auth: { user: gmailUser, pass: gmailPass } })
@@ -169,8 +177,8 @@ export default async function handler(req: any, res: any) {
     enviados += n
     if (n > 0) familiasNotificadas++
 
-    // E-mail: só para os membros desta família.
-    if (transporter) {
+    // E-mail: só Premium, e só para os membros desta família.
+    if (transporter && premiumSet.has(familiaId)) {
       const destinatarios = emailsMap.get(familiaId) || []
       if (destinatarios.length > 0) {
         try {

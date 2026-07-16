@@ -5,10 +5,12 @@ import type { ItemEstoqueCompleto } from '../lib/types'
 import { UNIDADE_LABEL, FORMA_LABEL } from '../lib/types'
 import { diasParaVencer, formatarData } from '../lib/dates'
 import ValidadeBadge, { stripeClass } from '../components/ValidadeBadge'
+import { useFamilia } from '../lib/familiaContext'
 
 type Ordem = 'validade' | 'nome' | 'quantidade' | 'local'
 
 export default function Estoque() {
+  const { premium } = useFamilia()
   const [params] = useSearchParams()
   const [itens, setItens] = useState<ItemEstoqueCompleto[]>([])
   const [ordem, setOrdem] = useState<Ordem>('validade')
@@ -58,7 +60,11 @@ export default function Estoque() {
           <option value="quantidade">Quantidade</option>
           <option value="local">Local</option>
         </select>
-        <button className="btn btn-outline" style={{ minHeight: 44, marginLeft: 'auto' }} onClick={exportarCSV}>⬇️ CSV</button>
+        {premium ? (
+          <button className="btn btn-outline" style={{ minHeight: 44, marginLeft: 'auto' }} onClick={exportarCSV}>⬇️ CSV</button>
+        ) : (
+          <Link to="/premium" className="btn btn-outline" style={{ minHeight: 44, marginLeft: 'auto' }} title="Exportar CSV é um recurso Premium">⬇️ CSV ✨</Link>
+        )}
       </div>
 
       <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

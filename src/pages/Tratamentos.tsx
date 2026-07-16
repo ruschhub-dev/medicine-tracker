@@ -4,8 +4,11 @@ import { repo } from '../lib/repo'
 import type { Medicamento, Perfil, TratamentoCompleto } from '../lib/types'
 import { UNIDADE_LABEL, DIAS_SEMANA } from '../lib/types'
 import { hojeBrasilia } from '../lib/dates'
+import { useFamilia } from '../lib/familiaContext'
+import UpsellPremium from '../components/UpsellPremium'
 
 export default function Tratamentos() {
+  const { premium } = useFamilia()
   const [tratamentos, setTratamentos] = useState<TratamentoCompleto[]>([])
   const [perfis, setPerfis] = useState<Perfil[]>([])
   const [medicamentos, setMedicamentos] = useState<Medicamento[]>([])
@@ -68,6 +71,13 @@ export default function Tratamentos() {
     await repo.deleteTratamento(id)
     recarregar()
   }
+
+  if (!premium) return (
+    <UpsellPremium
+      titulo="Tratamentos"
+      descricao="Agende os horários de cada remédio e receba o lembrete na hora da dose."
+    />
+  )
 
   return (
     <div style={{ display: 'grid', gap: 16 }}>

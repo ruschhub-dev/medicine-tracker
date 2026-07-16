@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom'
 import { repo } from '../lib/repo'
 import type { DoseCompleta } from '../lib/types'
 import { UNIDADE_LABEL } from '../lib/types'
+import { useFamilia } from '../lib/familiaContext'
+import UpsellPremium from '../components/UpsellPremium'
 
 /** Data de 7 dias atrás, no fuso de Brasília. */
 function seteDiasAtras(): string {
@@ -10,6 +12,7 @@ function seteDiasAtras(): string {
 }
 
 export default function Hoje() {
+  const { premium } = useFamilia()
   const [doses, setDoses] = useState<DoseCompleta[]>([])
   const [periodo, setPeriodo] = useState<DoseCompleta[]>([])
   const [carregando, setCarregando] = useState(true)
@@ -45,6 +48,13 @@ export default function Hoje() {
     const base = tomadas + puladas + perdidas
     return { tomadas, puladas, perdidas, aderencia: base > 0 ? Math.round((tomadas / base) * 100) : null }
   }, [periodo])
+
+  if (!premium) return (
+    <UpsellPremium
+      titulo="Hoje"
+      descricao="A agenda de doses e o resumo de aderência fazem parte do Premium."
+    />
+  )
 
   if (carregando) return <p className="muted">Carregando…</p>
 
